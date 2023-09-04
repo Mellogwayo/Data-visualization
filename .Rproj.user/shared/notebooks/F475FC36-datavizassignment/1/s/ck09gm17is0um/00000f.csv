@@ -1,0 +1,8 @@
+"0","# Load the required packages"
+"0","library(leaflet)"
+"0",""
+"0","# Create a leaflet map"
+"0","leaflet(data ) %>%"
+"0","  addTiles() %>%"
+"0","  addMarkers(~LOCATION_LONGITUDE, ~LOCATION_LATITUDE, popup = ~REPORTING_AREA)"
+"2","Warning: Data contains 55 rows with either missing or invalid lat/lon values and will be ignored"

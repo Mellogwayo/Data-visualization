@@ -1,0 +1,2 @@
+"0","data<-read.csv(""37-00049_UOF-P_2016_prepped.csv"")"
+"0","df<- read.csv(""37-00049_UOF-P_2016_prepped.csv"") #Create a copy that will have no modifications"

@@ -1,0 +1,7 @@
+"0","# Calculate the number of officers who are involved in subject injury"
+"0","num_subject_injured <- data %>%"
+"0","  filter(SUBJECT_INJURY == ""Yes"") %>%"
+"0","  group_by(OFFICER_ID) %>%"
+"0","  summarize(num_injuries = n())"
+"0",""
+"0","num_subject_injured"

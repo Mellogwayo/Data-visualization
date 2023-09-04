@@ -1,0 +1,571 @@
+---
+title: "MA304:DATA VISUALIZATION"
+author: '2202026'
+date: "2023-04-06"
+output:
+  word_document: default
+  html_document: default
+editor_options:
+  markdown:
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# An analysis of a policing dataset from Dallas, Texas in 2016
+
+## Introduction
+
+The goal of this task is to provide an analysis of a policing dataset from Dallas, Texas in 2016.
+This task is important as it will help us identify patterns and relationships between variables thus we can understand how they impact each other.
+When dealing with police data, analyzing trends can help identify patterns and relationships between variables such as crime types, locations, and time of day.
+This can provide insights into where and when crimes are most likely to occur, which can help police departments to allocate resources more effectively.
+Analyzing trends can also help predict future crime trends and patterns, which can be used to prevent crime and improve public safety.
+Identifying an increase in a certain type of crime would be a signal to the police departments to increase their focus and efforts on those areas to prevent further incidents from occurring.
+Identifying outliers in policing data can also be crucial.
+Outliers in crime data could be indicators of unique crime events that do not occur often.
+These events may require special attention and thus this information is important to police departments as they may need to be prepared in the event that they take place.
+Data is collected and analysed so that it can be used to make informed decisions.
+The analysis of a data set helps people identify trends, and patterns that can improve decision-making.
+Areas that need improvement, resources that need to be allocated and change that need to be made can be informed through analysis activities.
+Data-driven decisions are always informed decisions.
+This is particularly important for a police department as they can use the information gained to prevent crime and improve public safety.
+
+## Initial Exploration of the data set
+
+Conducting an initial exploration of a given data set is a crucial step.
+This task helps the analyst gain a better understanding of the data and the variables in the dataset.
+This understanding is what helps in developing hypotheses and questions that guide further analysis.
+Exploring a data set helps one to identify errors, inconsistencies, or missing values in the data.
+Dealing with errors and discrepancies can help ensure that the data is accurate and reliable.
+This is important as errors can affect the results of the analysis.
+Exploring the data set acts as a guide on what data preprocessing or cleaning tasks need to be done.
+Preprocessing tasks include transforming variables to their right form and imputing missing values where necessary.
+
+The first task involves introducing the data set into the environment.
+Creating a copy of a data frame preserves the original data collected.
+It also provides a level of safety and flexibility when working with data, and can help ensure that the data remains intact and accurate throughout the analysis.
+
+```{r Introduce data-frame}
+data<-read.csv("37-00049_UOF-P_2016_prepped.csv")
+df<- read.csv("37-00049_UOF-P_2016_prepped.csv") #Create a copy that will have no modifications
+```
+
+The data set in use contains 2384 observations of 47 variables.
+By looking at the data frame, it can be seen that all the variables have been classified as characters.
+Even those that appear to have numerical inputs
+
+```{r Initial exploration}
+str(data)#gives some properties of the variables
+dim(data)#gives dimensions of the data frame 
+names(data)# gives names of variables
+```
+
+Checking for duplicates is done to ensure the data we are analyzing is accurate and of high quality.
+It is observed that the data set has no duplicates.
+
+```{r checking duplicates}
+# Get the logical vector indicating duplicates
+duplicates_mask <- duplicated(data)
+
+# Select only the first 100 rows of the logical vector
+first_100_duplicates <- head(duplicates_mask, n = 100)
+
+# Print some of the duplicates
+print(first_100_duplicates)
+```
+
+From the initial exploration it was seen that the first row in the data frame contains the labels of the variables.
+This is redundant given that the variables already have labels.
+It also means that the labels are counted as observations.
+The number of observations in the data frame has now reduced to 2383.
+
+## Data Cleaning
+
+```{r Remove the first row from the data frame }
+data <- data[2:nrow(data), ] 
+dim(data)
+```
+
+The next step involves identifying the type of variables in the data frame this is important as it will help in selecting the appropriate data cleaning and analysis techniques. It will also help in the identification of potential errors that could prevent a consistent analysis from being done.
+This step is crucial in ensuring that our findings are communicated effectively.
+
+It is observed that all variables have been classified as characters despite some being made to represent dates and numbers.
+
+```{r identify the type of variables }
+sapply(data, function(x) is.character(x))
+sapply(data, function(x) is.numeric(x)) # it seems all the variables are characters 
+head(data) # this should not be the case as we can see some dates and numbers 
+```
+
+Further transformations of need to be done to ensure the appropriate analysis techniques are done.
+Numerical, categorical and time series data can not be analysed in the same way.
+Obtaining the names of the variables gives an understanding of what they mean and how they should be transformed if they are required to.
+
+```{r obtaining the names of the variables}
+names(data)  
+```
+
+There are two variables that represent the moment and incident occurred.
+They are in the form of date and time.These variables are combined as they would help in looking for patterns in a data set over time a given.
+Combining these variables would also help in the creation of more appealing visuals.
+The INCIDENT_TIME variable can be discarded after this transformation.
+It is worth noting that this variable is still classified as a character.
+
+```{r Combine date and time into a single variable}
+# 
+data$INCIDENT_DATE_AND_TIME <- paste(data$INCIDENT_DATE, data$INCIDENT_TIME)
+head(data$INCIDENT_DATE_AND_TIME) 
+class(data$INCIDENT_DATE_AND_TIME ) # gives type of a variable
+```
+
+```{r Removing INCIDENT_TIME }
+library(dplyr)
+data <- select(data, -INCIDENT_TIME)
+dim(data)#data frame should have 47 variables
+```
+
+The conversion of variables to their right form starts with those that represent time and date.The variable type used to represent time is in the "POSIXIt" class. The variable type used to represent the date is in the "Date" class.
+
+The INCIDENT_DATE_AND_TIME variable is transformed to the "POSIXlt" "POSIXt" class.
+Whereas the OFFICER_HIRE_DATE variable is transformed into the "Date" class.
+
+```{r Converting time and date variables}
+data$INCIDENT_DATE_AND_TIME  <- strptime(data$INCIDENT_DATE_AND_TIME, format = "%m/%d/%y %I:%M:%S %p")
+class(data$INCIDENT_DATE_AND_TIME)#ensure that it's in the right form
+
+data$OFFICER_HIRE_DATE <- as.Date(data$OFFICER_HIRE_DATE, format = "%m/%d/%Y",  na.strings = "NA")
+class(data$OFFICER_HIRE_DATE)#ensure that it's in the right form
+
+data$INCIDENT_DATE <- as.Date(data$INCIDENT_DATE, format = "%m/%d/%Y", na.strings = "NA")
+class(data$INCIDENT_DATE)#ensure that it's in the right form
+```
+
+The following variables are transformed to numeric form
+
+-   UOF_NUMBER
+
+-   OFFICER_ID
+
+-   OFFICER_YEARS_ON_FORCE
+
+-   SUBJECT_ID
+
+-   REPORTING_AREA
+
+-   BEAT
+
+-   SECTOR
+
+-   STREET_NUMBER
+
+-   LOCATION_LATITUDE
+
+-   LOCATION_LONGITUDE
+
+```{r convert the variables to numeric }
+data$UOF_NUMBER<- as.numeric(as.character(data$UOF_NUMBER), na.rm = TRUE)
+class(data$UOF_NUMBER) # check if the variable is numeric
+
+data$OFFICER_ID<- as.numeric(as.character(data$OFFICER_ID), na.rm = TRUE)
+class(data$OFFICER_ID) # check if the variable is numeric
+
+data$OFFICER_YEARS_ON_FORCE <- as.numeric(as.character(data$OFFICER_YEARS_ON_FORCE), na.rm = TRUE)
+class(data$OFFICER_YEARS_ON_FORCE) # check if the variable is numeric
+
+data$SUBJECT_ID <- as.numeric(as.character(data$SUBJECT_ID), na.rm = TRUE)
+class (data$SUBJECT_ID) # check if the variable is numeric
+
+data$REPORTING_AREA <- as.numeric(as.character(data$REPORTING_AREA), na.rm = TRUE)
+class(data$REPORTING_AREA) # check if the variable is numeric
+
+data$BEAT <- as.numeric(as.character(data$BEAT), na.rm = TRUE)
+class(data$BEAT) # check if the variable is numeric
+
+data$SECTOR <- as.numeric(as.character(data$SECTOR), na.rm = TRUE)
+class(data$SECTOR) # check if the variable is numeric
+
+data$STREET_NUMBER <- as.numeric(as.character(data$STREET_NUMBER), na.rm = TRUE)
+class(data$STREET_NUMBER) # check if the variable is numeric
+
+data$LOCATION_LATITUDE <- as.numeric(as.character(data$LOCATION_LATITUDE), na.rm = TRUE)
+class(data$LOCATION_LATITUDE) # check if the variable is numeric
+
+data$LOCATION_LONGITUDE <- as.numeric(as.character(data$LOCATION_LONGITUDE), na.rm = TRUE)
+class(data$LOCATION_LONGITUDE)# check if the variable is numeric
+```
+
+The variable NUMBER_EC_CYCLES could refer to the number of electronic control cycles used in the incident.
+This explains why it consists of both numerical and categorical inputs.
+Electronic control devices could include Tasers which are known to use electrical current to immobilize a subject.
+The number of cycles used may provide insight into the level of force used and could be relevant to an investigation of the incident.
+It also has more than one numerical input in some entries. This variable was excluded from the transformation as some information would have been lost if it were transformed.
+It remained with the classification of category.
+
+```{r understanding the NUMBER_EC_CYCLES variable }
+unique(data$NUMBER_EC_CYCLES)
+class(data$NUMBER_EC_CYCLES)
+```
+
+The transformation of the variables to the right form was done successfully as shown below.
+
+```{r check if conversion is correct}
+str(data)
+```
+
+The number of missing values can affect the choice of data analysis techniques.
+Knowing the number of missing values can help to determine which analysis techniques are appropriate and ensure that the results are valid.
+
+It is observed that there are 1756 missing variables.
+From this observation, it is seen that only 4 variables had missing inputs.
+This is observation does not act as a huge barrier for us to conduct a conclusive analysis.
+Further discussion and exploration on what the missing variables is done in the next section.
+
+```{r Count the number of missing values in each column of the data frame}
+sum(is.na(data)) # there are 1756 missing values in the data frame
+sapply(data, function(x) sum(is.na(x)))#No. of missing values in each column of the data frame
+```
+
+These missing values can be represented visually as shown below:
+```{r histogram}
+library(VIM)
+aggr_plot <- aggr(data, col=c('navyblue','red'),numbers=TRUE,sortVars=TRUE,
+                  labels=names(data),cex.axis=.7,gap=3,
+                  ylab=c("Histogram of Missing data","Pattern of Missing data"))  
+```
+
+
+## The variables in the Policing Data set
+
+The variables in the data set contain inputs of various incidents that were handled by the police in Dallas, Texas in 2016.
+There were 2383 incidents in that year.
+The time and place these incidences occurred are given.
+Various police officers handled the matter and they are represented by the OFFICER_ID variable.
+These incidences also involved subjects who are represented by a SUBJECT_ID. Characteristics of the officers and subjects involved are given by various variables. Other variables describe the actions and events that took place in a given incident.
+
+## Identifying Patterns and Trends in policing in Dallas, Texas in 2016
+
+As it was mentioned above the significance of the missing variables is not very strong given that they only consist of a small part of the entire data set.
+
+The variables with missing values and the number of missing inputs they have is as follows:
+
+-   INCIDENT_DATE_AND_TIME has 10 missing values
+
+-   UOF_NUMBER has 1636 missing values
+
+-   LOCATION_LATITUDE has 55 missing values
+
+-   LOCATION_LONGITUDE has 55 missing values
+
+LOCATION_LATITUDE and LOCATION_LONGITUDE have the same number of missing values.
+Aside from that they also have a similar pattern of missing inputs.
+The data set has other variables such as STREET_NUMBER and STREET_NAME which represents location.
+Thus this is observation not an alarming matter.
+
+### Which demographic has the most arrests?
+
+#### What race has the most arrests?
+
+```{r Two way table}
+
+mytable <- table(data$SUBJECT_RACE, data$SUBJECT_WAS_ARRESTED)
+mytable
+```
+
+From the table above it can be seen that most of the subjects arrested are black.
+It is also interesting how no arrest has been made on 'American Ind' and 'Asian' subjects whenever they are confronted by the police.
+
+#### Which gender has the most arrests?
+
+```{r Bar plot}
+library(ggplot2)
+num_arrests_by_gender <- data %>%
+  filter(SUBJECT_WAS_ARRESTED == "Yes") %>%
+  group_by(SUBJECT_GENDER) %>%
+  summarize(num_arrests = n())
+
+num_arrests_by_gender
+
+library(ggplot2)
+library(scales)
+
+# Calculate the total number of arrests
+total_arrests <- sum(num_arrests_by_gender$num_arrests)
+
+# Create a bar plot of the number of arrests by gender
+ggplot(num_arrests_by_gender, aes(x = SUBJECT_GENDER, y = num_arrests/total_arrests, fill = SUBJECT_GENDER)) + 
+  geom_bar(stat = "identity") +
+  labs(title = "Number of Arrests by Gender", x = "Gender", y = "Percentage of Arrests") +
+  # Set the y-axis limits to 0-1 and format the labels as percentages that sum up to 100%
+  scale_y_continuous(limits = c(0, 1), labels = percent_format(accuracy = 1)) +
+  # Add text labels at the top of the bars
+  geom_text(aes(label = num_arrests), position = position_stack(vjust = 0.5))
+```
+
+From the plot above it is seen that the male gender has the most arrests.
+The difference in arrests between the two genders is quite significant.
+It is seen that 1661 men are arrested whereas 378 women are arrested.Female arrests constitute of less than 25% of the arrests
+
+### How many officers are injured at work?
+
+```{r Histogram}
+library(ggplot2)
+# Calculate the number of officers who are injured
+num_officers_injured <- data %>%
+  filter(OFFICER_INJURY == "Yes") %>%
+  group_by(OFFICER_ID) %>%
+  summarize(num_injuries = n())
+
+num_officers_injured
+sum(num_officers_injured$num_injuries)
+
+# Create a histogram of the number of officers who are injured
+ggplot(num_officers_injured, aes(x = num_injuries)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "lightblue", alpha = 0.7) +
+  labs(title = "Number of officers who are injured", x = "Number of Injuries", y = "Count") +
+  theme_minimal()
+
+```
+
+A total of 234 police officers incur injuries.
+From the plot above it is seen that most officers who incur injuries incur one injury.
+This shows that police officer injury is not very common.
+
+### Which officers are involved in the most subject injury?
+
+```{r Scatter plot}
+# Calculate the number of officers who are involved in subject injury
+num_subject_injured <- data %>%
+  filter(SUBJECT_INJURY == "Yes") %>%
+  group_by(OFFICER_ID) %>%
+  summarize(num_injuries = n())
+
+num_subject_injured
+sum(num_subject_injured$num_injuries)
+
+library(ggplot2)
+library(plotly)
+
+p <- ggplot(num_subject_injured, aes(x = OFFICER_ID, y = num_injuries)) +
+  geom_point(color = "red", alpha = 0.7) +
+  labs(title = "Scatter Plot of Number of subject injuries involved by an officer", x = "Officer ID", y = "Number of Injuries") +
+  theme_minimal()
+
+ggplotly(p)
+
+```
+
+629 officers are involved in subject injury.
+From the scatter plot it is seen that most injuries have occurred once.
+This means that most of the officers involved have only been part of a such a case once.
+There are those that have done it more than once.The red dots represent officers.
+Officers are expected to use force only when necessary and to use the minimum amount of force needed to accomplish their objectives. The officer with ID number 10818 has been involved in a total of 7 injuries an investigation into their actions is warranted and potentially disciplinary action or criminal charges could be imposed if they are found to have acted improperly.
+
+### Experience level of officers
+
+#### Viewing the distribution of reasons for use of force based on the number of years on the force.
+
+```{r Box plot}
+# Create a subset of the data with the necessary variables
+force_years <- data[, c("REASON_FOR_FORCE", "OFFICER_YEARS_ON_FORCE")]
+
+# Create the box plot
+ggplot(force_years, aes(x = OFFICER_YEARS_ON_FORCE, y = REASON_FOR_FORCE)) +
+  geom_boxplot() +
+  labs(title = "Reason for Use of Force by Officer Years on Force",
+       x = "Officer Years on Force",
+       y = "Reason for Use of Force") +
+  theme_minimal()
+
+```
+
+From the plot above it is seen that officers that use force more often have been on force for 5 to 10 years whereas those that have been on force for the longer years rarely use force.
+Crowd disbursement results in the use of force by more experienced police officers and this could be because of their experience in such situations.
+Despite being more observed in police with less experience outliers are observed in weapon display, other cases, danger to self or others and arrest.
+With arrest having the most.
+The less frequent use of force by police officers with more years of experience could be attributed to them having a better ability to deal with incidences without force.
+It also seems that in the case of aggressive animals, all officers of all experience levels use force.
+
+### What variables have high correlations?
+
+Correlation is a measure of linear association between two continuous variables.
+Thus only numerical variables where considered.
+To include some key categorical variables we converted them to factors.
+OFFICR_ID and ,SUBJECT_ID were the only numerical variables that were not included.BEACT, SECTOR and REPORTING_AREA were removed as they are communicating the same information.
+
+Given that we have several variables that we can use to calculate correlations with, we opted to only focus on the top 10 variables to obtain a more informative visual representation.
+
+```{r Correlation visualization}
+library(corrplot)
+library(ggcorrplot)
+library(reshape2)
+attach(data)
+
+# Convert the vector to a factor
+Officerrace<- factor(OFFICER_RACE)
+subjectarrest <- factor(SUBJECT_WAS_ARRESTED)
+officergender <- factor(OFFICER_GENDER)
+subjectrace <- factor(SUBJECT_RACE)
+subjectgender<- factor(SUBJECT_GENDER)
+subjectinjury <- factor(SUBJECT_INJURY)
+officerinjury <- factor(OFFICER_INJURY)
+
+# Subset the dataset to numerical variables only
+subdata <- data.frame(UOF_NUMBER,OFFICER_YEARS_ON_FORCE,BEAT, INCIDENT_DATE_AND_TIME, OFFICER_HIRE_DATE, Officerrace, subjectarrest, officergender, subjectrace, subjectgender, subjectinjury, officerinjury  )
+
+# convert the data frame to numeric
+subdata <- apply(subdata, 2, as.numeric)
+
+
+cor_matrix <- cor(subdata)
+
+# Creating a matrix of the same dimensions as cor_matrix, but with all entries set to 0
+mask <- matrix(0, nrow(cor_matrix), ncol(cor_matrix))
+
+# Setting entries in the mask matrix to 1 for correlations that are above the threshold (0.7)
+mask[abs(cor_matrix) > 0] <- 1
+
+# Creating a heat map of the correlation matrix, with high correlations highlighted in red
+library(ggplot2)
+ggplot2::ggplot(data = reshape2::melt(cor_matrix)) +
+  ggplot2::geom_tile(ggplot2::aes(x = Var1, y = Var2, fill = value)) +
+  ggplot2::geom_text(data = reshape2::melt(cor_matrix * mask),
+               ggplot2::aes(x = Var1, y = Var2, label = round(value, 2)),
+               color = "red") +
+  ggplot2::scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                          midpoint = 0, limit = c(-1,1), space = "Lab",
+                          name="Correlation\nCoefficient") +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 1, 
+                                             size = 10, hjust = 1)) +
+  ggplot2::coord_fixed()
+```
+
+It can be seen that most variables do not have high correlations however beat and officer years on force have a mid-level correlation as specified in the code that generated the plot.
+This could be explained by the fact that.
+A possible explanation could be that officers with more years on the force may have developed closer relationships with members of the community they serve, and may therefore have a greater understanding of the needs and concerns of residents in specific areas or beats.
+This could lead to more effective policing and a lower crime rate, which could in turn lead to a correlation between officer experience and beat.
+
+### Number of Incidences per day
+
+#### What date has the most incidences?
+
+There is no single variable that represents the number of incidents reported.
+However, there exists a variable that gives us the date these incidents occur on a given day.
+Using this information helps us group incidences by day to generate the number of incidences that have occurred on a given day.
+
+```{r Time series plot}
+library(tidyverse)
+library(plotly)
+
+# Group data by day and calculate total incidents
+daily_incidents <- data %>%
+  group_by(INCIDENT_DATE) %>%
+  summarise(total_incidents = n())
+
+# Create time series plot with plotly
+plot_ly(daily_incidents, x = ~INCIDENT_DATE, y = ~total_incidents, type = "scatter", mode = "lines") %>%
+  layout(title = "Total Incidents per Day",
+         xaxis = list(title = "Date"),
+         yaxis = list(title = "Total Incidents"),
+         colorway = c("blue", "red", "green", "orange", "purple")) %>%
+  highlight(on = "plotly_hover", dynamic = TRUE)
+
+```
+
+From the plot above time series plot it can be seen that the highest number of incidents occurred on the 30th of September.
+It is followed by the 14th of February..
+Valentine's Day is a holiday that is traditionally associated with romance and love.
+For some people, this day can be a source of stress, anxiety, or disappointment.
+This could lead to an increase in domestic disputes or other incidents that require police intervention.
+Special Events and activities often take place on this day and they often require a large police presence.
+These reasons could explain the spike in reported incidences.
+
+#### Is there a relationship between the number of incidences and officer experience?
+
+```{r The use of smoothing to illustrate pattern/trend}
+# Create a scatter plot with a loess smoothing line
+ggplot(data, aes(x = OFFICER_YEARS_ON_FORCE, y = INCIDENT_DATE)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE) +
+  labs(x = "Officer Years on Force", y = "Number of Incidents", 
+       title = "Relationship between Officer Experience and Incidents") 
+```
+
+From the plot above it can be seen that the officers with less experience report the most incidences.
+This could be explained by the fact that newer officers tend to have a bias to report more cases that they observe due to their low level of experience in discerning what counts as a case.
+They may also use excessive force as seen in the box plot above thus leading to a higher number of incidences.
+
+The smoothing line being in the middle of the graph shows us that there is no clear linear relationship between Officer Experience and Incidents reported.
+This could indicate that the variables are not strongly correlated.
+Saying that police officers with less experience report more cases is a major generalization that ought to be avoided.Other variables could cause the surge of incidences among officers with lower experience.
+
+#### Could officer race explain the relationship between the number of incidences and officer experience?
+
+```{r Scatterplot}
+library(plotly)
+
+plot_ly(data , x = ~OFFICER_YEARS_ON_FORCE, y = ~INCIDENT_DATE, color = ~OFFICER_RACE, size = ~UOF_NUMBER,
+        mode = "markers", type = "scatter") %>% 
+  layout(title = "Number of Incidents vs Officer Years on Force",
+         xaxis = list(title = "Officer Years on Force"),
+         yaxis = list(title = "Incident Date"))
+
+```
+
+based on the information provided in the plot, it appears that the officers involved in the incidents of police use of force are mainly white. This is indicated by the fact that the color of the points on the plot represents officer race, and most of the points are white. 
+
+```{r table }
+table(data$OFFICER_RACE)
+```
+
+The table above gives us the racial makeup of the police force as a whole. It can be seen that most police officers are white. This means that there is an over-representation of white officers in the Dallas police department and not in those that use force.
+
+### Reporting areas
+
+The map below shows us the areas that have been received police reports in Dallas, Texas.
+By Visualizing cases on a map, we can see where they are concentrated and whether they are clustered in particular regions or areas.
+This can help us identify crime or incident hotspots that may require further investigation.
+Mapping can also help us understand the relationship between cases and other physical features that define the locale of an area such as the presence of schools, entertainment spots and even the population density.
+Areas with high incidences could help the police force make informed decisions such as where they should deploy more reinforcement.
+
+```{r leaflet map}
+# Load the required packages
+library(leaflet)
+
+# Create a leaflet map
+leaflet(data ) %>%
+  addTiles() %>%
+  addMarkers(~LOCATION_LONGITUDE, ~LOCATION_LATITUDE, popup = ~REPORTING_AREA)
+```
+
+Creating a map that shows Incident Reason, Officer Race, Subject Race, and Subject Offense allows us to visually analyze and understand the relationships between these variables in a geographic context.
+Mapping incident reasons can provide insights into the types of incidents that occur in different areas.
+An incident reason like bulglary could indicate that houses there need better security systems.
+Including subject race in the map can help us understand if certain incident reasons are more prevalent in areas with a particular demographic makeup.
+This could indicate the existence of systemic issues that need to be addressed. The variable subject offence gives more context to the incidence being addressed.
+
+```{r Leaflet map}
+library(leaflet)
+
+leaflet(data) %>% 
+  addTiles() %>% 
+  addMarkers(lng = ~LOCATION_LONGITUDE, lat = ~LOCATION_LATITUDE,
+             popup = ~paste("Incident Reason: ", INCIDENT_REASON,
+                            "<br>Subject Race: ", SUBJECT_RACE,
+                            "<br>Subject Offense: ", SUBJECT_OFFENSE
+                            ))
+
+```
+
+From the plot above we can see that within the same local the following cases have been reported:
+
+| Variable        | Input                                                       | Input      |
+|-----------------|-------------------------------------------------------------|------------|
+| Incident Reason |  Arrest                                                     | Arrest     |
+| Subject Race    | Black                                                       | Black      |
+| Subject Offense | Drug Possession - Misdemeanor, Evading Arrest, Warrant/Hold | Assault/FV |
+
+This shows us that most perpetrators in the area are black and are involved in violent crimes that involve drug cases that end in arrest.

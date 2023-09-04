@@ -1,0 +1,361 @@
+#MA321 ASSIGNMENT
+###INSTALLING NECESSARY LIBRARIES
+#install.packages("VIM")
+library("VIM")
+library("dplyr")
+#install.packages("tidyverse")
+library("tidyverse")
+library("corrplot")
+#install.packages("mice")
+library("mice") 
+library("ggplot2")
+#install.packages("DataExplorer")
+library("DataExplorer")
+#install.packages("mvnormtest")
+library("mvnormtest")
+#install.packages("caTools")
+library(caTools)
+#install.packages("ggcorrplot")
+library("ggcorrplot")
+#install.packages("gmodels")
+library(gmodels)
+#install.packages("caret")
+library(caret)
+#install.packages("pls")
+library(pls)
+#install.packages("Metrics")
+library(Metrics)
+
+
+###############################################################################
+####  Q1: DESCRIPTIVE ANALYSIS
+################################################################################
+data <- read.csv("house-data.csv")# Load the dataset
+attach(data)
+head(data)# Viewing the first few rows of the dataset
+names(data)# Viewing the names of the variables
+dim(data) #An overview of the dataset's structure
+str(data)
+glimpse(data) 
+summary(data) #Numerical summaries of the variables in the dataset
+duplicated(data) ##check duplicate
+data[duplicated(data),]
+sapply(data, function(x) length(unique(x))) # Checks the number of distinct values in the variables
+num_var <- sapply(data, function(x) is.numeric(x)) # Identifies and displays numerical variables
+dim(data[, num_var]) #dimensions of numerical variables
+num_var_names <- names(data[, num_var]) #gives names of numerical variables
+
+#CHECKING FOR MISSING VARIABLES
+sum(is.na(data)) # 5910 missing values in data frame
+sapply(data, function(x) sum(is.na(x))) #No. of missing values in each column of the data frame
+missing_counts <- colSums(is.na(data)>0) #Counting variables with missing values 
+missing_var_names <- names(missing_counts[missing_counts > 0]) #Displaying names of variables with missing values 
+df_naCols <- which(colSums(is.na(data))>0) # Identify variables with NAs
+sort(colSums(sapply(data[df_naCols],is.na)), decreasing = TRUE) # 10 variables with NAs (Total NAs ordered in Dec)
+
+plot_histogram(data) #Graphical description of the data set 1
+md.pattern(data) #We can see that only 10 variables have missing values(they have red boxes)
+aggr(data[-1], prop = T, numbers = T, cex.axis=.5, cex.numbers = 0.1,
+     ylab=c("Proportion of missing values in the data set","Pattern of missing values"),
+     labels=names(data[-1])) #Graphical description of the data set 2
+aggr_plot <- aggr(data, col=c('navyblue','red'),numbers=TRUE,sortVars=TRUE,
+                  labels=names(data),cex.axis=.7,gap=3,
+                  ylab=c("Histogram of Missing data","Pattern of Missing data"))  #Graphical description of the data set 3
+
+#Replace the missing categorical variables with 'no' as they imply that a house/property has a missing trait.       
+data[, !(names(data) %in% c("LotFrontage", "MasVnrArea"))][is.na(data[, !(names(data) %in% c("LotFrontage", "MasVnrArea"))])] <- "no"
+str(data)
+
+#view missing variables again
+sum(is.na(data)) # 267 missing values in data frame
+df_naCols <- which(colSums(is.na(data))>0) # Identify variables with NAs
+sort(colSums(sapply(data[df_naCols],is.na)), decreasing = TRUE) # 2 variables with NAs (Total NAs ordered in Dec)
+
+#impute NAs - In this case, the random forest mice function is used. Random m set to 5
+imp_data <- mice(data, seed = 123, m=5, method = "rf")
+data <- complete(imp_data,3) # use 3rd cycle complete imputed dataset
+
+summary(complete(data)) #Summary for Descriptive Statistical Analysis
+data = subset(data,select=-c(Id)) #remove ID variable
+sapply(data, function(x) sum(is.na(x))) # Check for any NA after imputation 
+sum(is.na(data)) # good to go!
+
+##Further transformations to the data set
+df_allfactor <- data.frame(data) #Factor all categorical variables
+df_allfactor[sapply(df_allfactor, is.character)] <- lapply(df_allfactor[sapply(df_allfactor, is.character)], as.factor)
+str(df_allfactor)
+
+df_transform <- data.frame(data)#Data frame with all numerical variables
+df_transform$Street<- as.numeric(df_transform$Street == "Pave") #Transforming categorical variables to binary numerical values 
+str(df_transform)
+#Transforming 21 categorical variables to nominal numerical values
+dummy_vars <- model.matrix(~ Alley + Utilities + LotConfig + Neighborhood + Condition1 + Condition2
+                          + BldgType + HouseStyle + RoofStyle + RoofMatl + Exterior1st + Foundation
+                           + Heating + Functional + GarageType + GarageCond + PavedDrive + Fence + MiscFeature
+                           + SaleType + SaleCondition- 1, data = df_transform)# put them to a dummy variable
+df_transform <- cbind(df_transform, dummy_vars) # merge the dummy variables with the original data frame
+df_transform =subset(df_transform, select = -c(Alley, Utilities, LotConfig, Neighborhood, Condition1, Condition2,
+                    BldgType, HouseStyle, RoofStyle, RoofMatl, Exterior1st, Foundation, Heating, Functional, 
+                    GarageType, GarageCond, PavedDrive, Fence, MiscFeature, SaleType, SaleCondition))#remove original variables that have been transformed
+df_transform # display the merged data frame
+#Ordinal categorical variables: 
+unique(df_transform$ExterQual)
+df_transform$ExterQual <- factor(df_transform$ExterQual, levels = c("Ex","Gd","TA","Fa"), ordered = TRUE)
+df_transform$ExterQual_num <- as.numeric(df_transform$ExterQual)
+
+unique(df_transform$ExterCond)
+df_transform$ExterCond <- factor(df_transform$ExterCond, levels = c("Ex","Gd","TA","Fa","Po"), ordered = TRUE)
+df_transform$ExterCond_num <- as.numeric(df_transform$ExterCond)
+
+unique(df_transform$BsmtQual)
+df_transform$BsmtQual<- factor(df_transform$BsmtQual, levels = c("Ex","Gd","TA","Fa","Po","no"), ordered = TRUE)
+df_transform$BsmtQual_num <- as.numeric(df_transform$BsmtQual)
+
+unique(df_transform$BsmtCond)
+df_transform$BsmtCond<- factor(df_transform$BsmtCond, levels = c("Gd","TA","Fa","Po","no"), ordered = TRUE)
+df_transform$BsmtCond_num <- as.numeric(df_transform$BsmtCond)
+
+unique(df_transform$KitchenQual)
+df_transform$KitchenQual<- factor(df_transform$KitchenQual, levels = c("Ex","Gd","TA","Fa"), ordered = TRUE)
+df_transform$KitchenQual_num <- as.numeric(df_transform$KitchenQual)
+
+unique(df_transform$PoolQC)
+df_transform$PoolQC<- factor(df_transform$PoolQC, levels = c("Ex","Gd","Fa","no"), ordered = TRUE)
+df_transform$PoolQC_num <- as.numeric(df_transform$PoolQC)
+df_transform =subset(df_transform, select = -c(ExterQual,ExterCond,BsmtQual,BsmtCond,KitchenQual,PoolQC)) #remove original variables that have been transformed
+df_transform # display the merged data frame
+str(df_transform)
+
+#Exploring the Distribution of the dataset
+#Creating frequency tables and histograms for some of the variables
+freq_table1 <- as.data.frame(table(data$LotFrontage)) # Creating a frequency table for LotFrontage
+ggplot(freq_table1, aes(x = Var1 , y = Freq)) +
+  geom_bar(stat = "identity", color = "black", fill = "blue") +
+  labs(title = "Frequency Table of LotFrontage", x = "LotFrontage", y = "Frequency") +
+  scale_x_discrete(labels = levels(data$LotFrontage)) +
+  theme_bw() # Create a bar chart of LotFrontage frequencies
+
+freq_table2 <- as.data.frame(table(data$Alley)) # Creating a frequency table for Alley
+ggplot(freq_table2, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", color = "black", fill = "blue") +
+  labs(title = "Frequency Table of Alley", x = "Alley", y = "Frequency") +
+  scale_x_discrete(labels = levels(data$Alley)) +
+  theme_bw() # Create a bar chart of Alley frequencies
+
+freq_table3 <- as.data.frame(table(data$Street)) #Creating a frequency table for Street frequencies
+ggplot(freq_table3, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", color = "black", fill = "blue") +
+  labs(title = "Frequency Table of Street", x = "Street", y = "Frequency") +
+  scale_x_discrete(labels = levels(data$Street)) +
+  theme_bw() # Creating a frequency table for Street
+
+freq_table4 <- as.data.frame(table(data$LotArea)) # Creating a frequency table for LotArea
+ggplot(freq_table4, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", color = "black", fill = "blue") +
+  labs(title = "Frequency Table of Var1", x = "Var1", y = "Frequency") +
+  scale_x_discrete(labels = levels(data$LotArea)) +
+  theme_bw() # Create a bar chart of Var1 frequencies
+
+#Testing for normality
+# Select all the numerical variables
+num_var <- sapply(data, function(x) is.numeric(x))
+dim(data[, num_var])
+num_var_names <- names(data[, num_var])
+num_var_names
+numerical<- data[, num_var]
+numerical
+# Loop through each column and perform Shapiro-Wilk test
+normality_tests <- lapply(numerical, shapiro.test)
+# Extract the p-values from the normality tests
+p_values <- sapply(normality_tests, function(x) x$p.value)
+# Print the p-values
+print(p_values)
+
+#Identifying outliers
+#Numerical data
+boxplot(numerical[1:6])
+boxplot(numerical[7:13])
+boxplot(numerical[14:22])
+
+#Categorical data
+# Select all the categorical variables
+categorical <- subset(df_allfactor, select = -c(LotFrontage,LotArea,OverallQual,OverallCond,YearBuilt,
+                                        MasVnrArea,TotalBsmtSF,X1stFlrSF,X2ndFlrSF,LowQualFinSF,
+                                        GrLivArea,FullBath,BedroomAbvGr,KitchenAbvGr,TotRmsAbvGrd,
+                                        Fireplaces,GarageArea,PoolArea,MiscVal,MoSold,YrSold, SalePrice))
+categorical
+names(categorical)
+dim(categorical)
+#Creating a frequency table for frequencies
+freq_table1 <- as.data.frame(table(data$Street )) 
+freq_table2 <- as.data.frame(table(data$Alley))
+freq_table3 <- as.data.frame(table(data$Utilities)) 
+freq_table4 <- as.data.frame(table(data$LotConfig ))
+freq_table5 <- as.data.frame(table(data$Neighborhood )) 
+freq_table6 <- as.data.frame(table(data$Condition1))
+freq_table7 <- as.data.frame(table(data$Condition2)) 
+freq_table8 <- as.data.frame(table(data$BldgType))
+freq_table9 <- as.data.frame(table(data$HouseStyle)) 
+freq_table10 <- as.data.frame(table(data$RoofStyle))
+freq_table11 <- as.data.frame(table(data$RoofMatl)) 
+freq_table12 <- as.data.frame(table(data$Exterior1st))
+freq_table13 <- as.data.frame(table(data$ExterQual)) 
+freq_table14 <- as.data.frame(table(data$ExterCond))
+freq_table15 <- as.data.frame(table(data$Foundation)) 
+freq_table16 <- as.data.frame(table(data$BsmtQual))
+freq_table17 <- as.data.frame(table(data$BsmtCond )) 
+freq_table18 <- as.data.frame(table(data$Heating ))
+freq_table19 <- as.data.frame(table(data$KitchenQual )) 
+freq_table20 <- as.data.frame(table(data$Functional ))
+freq_table21 <- as.data.frame(table(data$GarageType )) 
+freq_table22 <- as.data.frame(table(data$GarageCond ))
+freq_table23 <- as.data.frame(table(data$PavedDrive )) 
+freq_table24 <- as.data.frame(table(data$PoolQC ))
+freq_table25 <- as.data.frame(table(data$Fence)) 
+freq_table26 <- as.data.frame(table(data$MiscFeature))
+freq_table27 <- as.data.frame(table(data$SaleType )) 
+freq_table28 <- as.data.frame(table(data$SaleCondition))
+#Creating a box plot to observe outliers
+ggplot(freq_table1, aes(x = Var1, y = Freq)) + geom_boxplot() #pave occurs more
+ggplot(freq_table2, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table3, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table4, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table5, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table6, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table7, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table8, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table9, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table10, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table11, aes(x = Var1, y = Freq)) + geom_boxplot() 
+ggplot(freq_table12, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table13, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table14, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table15, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table16, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table17, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table18, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table19, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table20, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table21, aes(x = Var1, y = Freq)) + geom_boxplot() 
+ggplot(freq_table22, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table23, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table24, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table25, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table26, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table27, aes(x = Var1, y = Freq)) + geom_boxplot()
+ggplot(freq_table28, aes(x = Var1, y = Freq)) + geom_boxplot()
+
+#Patterns and trends: CORRELATION
+#Correlation with 
+numericVars <- which(sapply(data, is.numeric)) #index vector numeric variables
+numericVarNames <- names(numericVars) #saving names vector for use later on
+all_numVar <- data[, numericVars]
+cor_numVar <- cor(all_numVar, use="pairwise.complete.obs") #correlations of all numeric variables
+#sort on decreasing correlations with SalePrice
+cor_sorted <- as.matrix(sort(cor_numVar[,'SalePrice'], decreasing = TRUE))
+#select only high correlations
+CorHigh <- names(which(apply(cor_sorted, 1, function(x) abs(x)>0.3| x< -0.3)))
+cor_numVar <- cor_numVar[CorHigh, CorHigh]
+corrplot.mixed(cor_numVar, tl.col="black", tl.pos = "lt")
+
+# calculate the correlations in categorical variables
+categorical2 <- subset(df_transform, select = -c(LotFrontage,LotArea,OverallQual,OverallCond,YearBuilt,
+                                                MasVnrArea,TotalBsmtSF,X1stFlrSF,X2ndFlrSF,LowQualFinSF,
+                                                GrLivArea,FullBath,BedroomAbvGr,KitchenAbvGr,TotRmsAbvGrd,
+                                                Fireplaces,GarageArea,PoolArea,MiscVal,MoSold,YrSold, SalePrice))
+categorical2
+corr1 <- cor(categorical2[1:7]) # Compute the correlation matrix
+corrplot.mixed(corr1, tl.col="black", tl.pos = "lt",
+                 title = "Correlation heatmap for categorical variables 1")#correlation heatmap )
+
+corr2 <- cor(categorical2[8:14]) # Compute the correlation matrix
+corrplot.mixed(corr2, tl.col="black", tl.pos = "lt",
+               title = "Correlation heatmap for categorical variables 2")#correlation heatmap )
+
+corr3 <- cor(categorical2[15:21]) # Compute the correlation matrix
+corrplot.mixed(corr3, tl.col="black", tl.pos = "lt",
+               title = "Correlation heatmap for categorical variables 3")#correlation heatmap )
+
+corr4 <- cor(categorical2[22:28]) # Compute the correlation matrix
+corrplot.mixed(corr4, tl.col="black", tl.pos = "lt",
+               title = "Correlation heatmap for categorical variables 4")#correlation heatmap )
+
+
+#############################################################################
+###  QUESTION 4: Research Question in Relation to House Data
+#############################################################################
+#Correlation with the target variable
+numericVars <- which(sapply(data, is.numeric)) #index vector numeric variables
+numericVarNames <- names(numericVars) #saving names vector for use later on
+all_numVar <- data[, numericVars]
+all_numVar <- all_numVar[, -22] #removes Sale price 
+cor_numVar <- cor(all_numVar, use="pairwise.complete.obs") #correlations of all numeric variables
+#sort on decreasing correlations with OverallQual
+cor_sorted <- as.matrix(sort(cor_numVar[,'OverallQual'], decreasing = TRUE))
+#select only high correlations
+CorHigh <- names(which(apply(cor_sorted, 1, function(x) abs(x)>0.3| x< -0.3)))
+cor_numVar <- cor_numVar[CorHigh, CorHigh]
+corrplot.mixed(cor_numVar, tl.col="black", tl.pos = "lt")
+# Use the caTools package to create random indices for the training and testing sets
+attach(data)
+Q3 <- data.frame(OverallQual,GrLivArea,YearBuilt,GarageArea,
+                 FullBath,TotalBsmtSF,MasVnrArea, Fireplaces)
+set.seed(123)
+split <- sample.split(Q3$OverallQual, SplitRatio = 0.8)
+
+# Create the training and testing sets based on the random indices
+train_data <- Q3[split, ]
+train_data <- data.frame(scale(train_data))#standardize the data
+test_data <- Q3[!split, ]
+test_data <- data.frame(scale(test_data))#standardize the data
+
+# Perform PCA on the training set
+preproc <- preProcess(train_data, method = c("center", "scale"))
+preproc 
+pca_model <- prcomp(predict(preproc, train_data), scale = TRUE)
+pca_model
+
+# !Create a biplot of the principal components
+biplot(pca_model)
+#Identify outliers
+outliers <- which(pca_model$x[,1] > 2.5 | pca_model$x[,1] < -2.5)
+text(pca_model$x[outliers,1], pca_model$x[outliers,2], labels = rownames(data)[outliers], col = "red", cex = 0.8)
+
+# Check the sign and magnitude of the loadings
+pca_model$rotation[,1:3]
+
+summary(pca_model)
+
+# Plot the screen plot to determine the number of principal components to retain
+plot(pca_model, type = "l")
+# using Kaiser's criterion to calculate the eigenvalues and determine which components have eigenvalues greater than one
+eig <- eigen(cor(predict(preproc, train_data)))
+eig$values
+# Plot the eigenvalues
+barplot(eig$values, 
+        main = "Scree Plot", 
+        xlab = "Component Number", 
+        ylab = "Eigenvalue")
+# Choose the number of principal components to retain based on the elbow in the screen plot
+num_pcs <- 2
+abline(v = num_pcs, col = "red") # add red line at elbow point
+
+# Use PLS regression to build a predictive model based on the retained principal components
+pls_model <- plsr(OverallQual ~ ., ncomp = 5, data = train_data, scale = TRUE)
+summary(pls_model)
+
+# Use the trained PLS model to predict Overall quality on the training set
+fitted_model <- predict(pls_model, newdata = train_data)
+
+# Use the trained PLS model to predict Overall quality on the testing set
+predictions <- predict(pls_model, newdata = test_data)
+
+# Evaluate the accuracy of the predictions
+rmse <- rmse(predictions, test_data$OverallQual)
+rmse
+r_squared <- R2(pls_model)
+r_squared
+
+
+
+

@@ -1,0 +1,26 @@
+{
+    "id": "9685FF59",
+    "path": "~/data visualization assignment/datavizassignment.R",
+    "project_path": "datavizassignment.R",
+    "type": "r_source",
+    "hash": "43014629",
+    "contents": "",
+    "dirty": false,
+    "created": 1682205685525.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "214,1",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1682442923,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1682442923832,
+    "read_only": false,
+    "read_only_alternatives": []
+}

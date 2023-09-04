@@ -1,0 +1,8 @@
+"0","library(ggplot2)"
+"0","# Calculate the number of officers who are injured"
+"0","num_officers_injured <- data %>%"
+"0","  filter(OFFICER_INJURY == ""Yes"") %>%"
+"0","  group_by(OFFICER_ID) %>%"
+"0","  summarize(num_injuries = n())"
+"0",""
+"0","num_officers_injured"
